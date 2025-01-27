@@ -1,0 +1,45 @@
+# Prerequisites Installation
+
+# 1. Install Kind
+brew install kind
+
+# 2. Install Helm
+brew install helm
+
+# 3. Install kubectl
+brew install kubectl
+
+# 4. Install Argo CLI
+brew install argocd
+brew install argo
+
+# Create Kind Cluster
+kind create cluster --name argo-demo --config kind-config.yaml
+
+# Create Namespaces
+kubectl create namespace argocd
+kubectl create namespace argo
+
+# Install ArgoCD using Helm
+helm repo add argo https://argoproj.github.io/argo-helm
+helm repo update
+
+# Install ArgoCD
+helm install argocd argo/argo-cd \
+  --namespace argocd \
+  --set server.service.type=NodePort \
+  --set server.service.nodePort=30007
+
+# Install Argo Workflows
+helm install argo-workflows argo/argo-workflows \
+  --namespace argo \
+  --set server.serviceType=NodePort \
+  --set server.serviceNodePort=30009
+
+# Install Argo Rollouts
+kubectl create namespace argo-rollouts
+helm install argo-rollouts argo/argo-rollouts \
+  --namespace argo-rollouts
+
+# Get ArgoCD admin password
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
