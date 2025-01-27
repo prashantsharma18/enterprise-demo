@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Trigger
+metadata:
+  name: demo-on-sync
+spec:
+  recipients:
+  - slack:demo-channel
+  template: app-sync-status
+  when: app.status.sync.status == 'Synced'
+
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Template
+metadata:
+  name: app-sync-status
+spec:
+  notification:
+    message: |
+      Application {{.app.metadata.name}} sync status is {{.app.status.sync.status}}.
+      Server: {{.app.spec.destination.server}}
+      Namespace: {{.app.spec.destination.namespace}}
+      Revision: {{.app.status.sync.revision}}

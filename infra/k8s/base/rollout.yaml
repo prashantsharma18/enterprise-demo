@@ -1,0 +1,44 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: enterprise-demo
+spec:
+  replicas: 3
+  strategy:
+    blueGreen:
+      activeService: enterprise-demo-active
+      previewService: enterprise-demo-preview
+      autoPromotionEnabled: false
+      prePromotionAnalysis:
+        templates:
+        - templateName: success-rate
+      postPromotionAnalysis:
+        templates:
+        - templateName: success-rate
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: enterprise-demo
+  template:
+    metadata:
+      labels:
+        app: enterprise-demo
+    spec:
+      containers:
+      - name: enterprise-demo
+        image: ghcr.io/YOUR_USERNAME/enterprise-demo:latest
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
