@@ -1,11 +1,29 @@
-# base/service.yaml
 apiVersion: v1
 kind: Service
 metadata:
-  name: enterprise-demo
+  name: enterprise-demo-active
+  labels:
+    app: enterprise-demo
 spec:
   ports:
   - port: 80
     targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: enterprise-demo
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: enterprise-demo-preview
+  labels:
+    app: enterprise-demo
+spec:
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: http
   selector:
     app: enterprise-demo
