@@ -43,3 +43,28 @@ helm install argo-rollouts argo/argo-rollouts \
 
 # Get ArgoCD admin password
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+
+# Use port-forwarding instead
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+
+
+Authentication Setup:
+bashCopy# The username is your GitHub username
+USERNAME=your-github-username
+For the password/token:
+
+Go to GitHub.com → Your Profile → Settings
+Navigate to "Developer settings" → "Personal access tokens" → "Tokens (classic)"
+Click "Generate new token (classic)"
+Select scopes:
+
+write:packages
+read:packages
+delete:packages
+repo (for private repositories)
+
+# Login to GHCR for testing in local
+docker login ghcr.io -u YOUR_GITHUB_USERNAME -p YOUR_PERSONAL_ACCESS_TOKEN
+
+# Pull your image (after pipeline succeeds)
+docker pull ghcr.io/YOUR_GITHUB_USERNAME/enterprise-demo:latest

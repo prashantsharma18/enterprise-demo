@@ -1,0 +1,14 @@
+apiVersion: notification.argoproj.io/v1alpha1
+kind: Trigger
+metadata:
+  name: deployment-status-change
+spec:
+  receivers:
+  - slack:demo-channel
+  templates:
+  - name: deployment-status
+  conditions:
+  - app.status.sync.status == 'Synced'
+  - app.status.sync.status == 'OutOfSync'
+  - app.status.sync.status == 'Failed'
+  - app.status.health.status == 'Degraded'

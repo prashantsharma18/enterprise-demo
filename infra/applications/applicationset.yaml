@@ -1,0 +1,44 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: enterprise-demo
+  namespace: argocd
+spec:
+  generators:
+  - list:
+      elements:
+      - cluster: in-cluster
+        environment: production
+        replicas: "3"
+      - cluster: in-cluster
+        environment: staging
+        replicas: "2"
+      - cluster: in-cluster
+        environment: dev
+        replicas: "1"
+  template:
+    metadata:
+      name: enterprise-demo-{{environment}}
+      namespace: argocd
+      finalizers:
+      - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/prashantsharma18/enterprise-demo.git
+        targetRevision: HEAD
+        path: infra/k8s/overlays/{{environment}}
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: {{environment}}
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+        - CreateNamespace=true
+      ignoreDifferences:
+      - group: apps
+        kind: Deployment
+        jsonPointers:
+        - /spec/replicas

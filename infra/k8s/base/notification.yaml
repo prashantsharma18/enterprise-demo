@@ -1,0 +1,16 @@
+apiVersion: notification.argoproj.io/v1alpha1
+kind: NotificationConfiguration
+metadata:
+  name: enterprise-demo-notifications
+spec:
+  templates:
+    - name: deployment-status
+      slack:
+        message: |
+          *Application*: {{.app.metadata.name}}
+          *Status*: {{.app.status.sync.status}}
+          *Environment*: {{.app.spec.destination.namespace}}
+          *Version*: {{.app.status.sync.revision}}
+          {{if eq .app.status.sync.status "Failed"}}
+          *Error*: {{.app.status.operationState.message}}
+          {{end}}

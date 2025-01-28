@@ -6,12 +6,13 @@ spec:
   metrics:
   - name: success-rate
     interval: 30s
-    count: 2
+    count: 5
     successCondition: result >= 0.95
+    failureCondition: result < 0.95
     provider:
       prometheus:
-        address: http://prometheus.monitoring:9090
+        address: http://prometheus-operated.monitoring:9090
         query: |
-          sum(rate(http_requests_total{status=~"2.*", service="enterprise-demo"}[5m])) 
-          / 
-          sum(rate(http_requests_total{service="enterprise-demo"}[5m]))
+          sum(rate(http_success_total{endpoint!~"metrics|health|ready"}[5m])) 
+          /
+          sum(rate(http_requests_total{endpoint!~"metrics|health|ready"}[5m]))
