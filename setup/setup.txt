@@ -37,9 +37,10 @@ helm install argo-workflows argo/argo-workflows \
   --set server.serviceNodePort=30009
 
 # Install Argo Rollouts
-kubectl create namespace argo-rollouts
 helm install argo-rollouts argo/argo-rollouts \
-  --namespace argo-rollouts
+  --namespace argo-rollouts \
+  --set dashboard.enabled=true \
+  --set dashboard.service.type=ClusterIP
 
 # Get ArgoCD admin password
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d

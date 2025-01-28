@@ -1,0 +1,14 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: enterprise-demo
+spec:
+  template:
+    spec:
+      containers:
+      - name: enterprise-demo
+        image: ghcr.io/prashantsharma18/enterprise-demo:latest  # This will be updated automatically
+  strategy:
+    blueGreen:
+      autoPromotionEnabled: true  # Auto-promote in dev environment
+      scaleDownDelaySeconds: 30
