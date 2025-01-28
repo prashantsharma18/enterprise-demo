@@ -7,21 +7,24 @@ spec:
   generators:
   - list:
       elements:
-      - cluster: in-cluster
-        environment: production
-        replicas: "3"
-      - cluster: in-cluster
-        environment: staging
-        replicas: "2"
-      - cluster: in-cluster
-        environment: dev
-        replicas: "1"
+        - cluster: in-cluster
+          url: https://kubernetes.default.svc
+          environment: production
+          replicas: "3"
+        - cluster: in-cluster
+          url: https://kubernetes.default.svc
+          environment: staging
+          replicas: "2"
+        - cluster: in-cluster
+          url: https://kubernetes.default.svc
+          environment: dev
+          replicas: "1"
   template:
     metadata:
-      name: enterprise-demo-{{environment}}
+      name: 'enterprise-demo-{{environment}}'
       namespace: argocd
       finalizers:
-      - resources-finalizer.argocd.argoproj.io
+        - resources-finalizer.argocd.argoproj.io
     spec:
       project: default
       source:
@@ -29,16 +32,16 @@ spec:
         targetRevision: HEAD
         path: infra/k8s/overlays/{{environment}}
       destination:
-        server: https://kubernetes.default.svc
-        namespace: {{environment}}
+        server: '{{url}}'
+        namespace: '{{environment}}'
       syncPolicy:
         automated:
           prune: true
           selfHeal: true
         syncOptions:
-        - CreateNamespace=true
+          - CreateNamespace=true
       ignoreDifferences:
-      - group: apps
-        kind: Deployment
-        jsonPointers:
-        - /spec/replicas
+        - group: apps
+          kind: Deployment
+          jsonPointers:
+            - /spec/replicas
