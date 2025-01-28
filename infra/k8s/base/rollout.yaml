@@ -26,7 +26,7 @@ spec:
     spec:
       containers:
       - name: enterprise-demo
-        image: ghcr.io/YOUR_USERNAME/enterprise-demo:latest
+        image: ghcr.io/prashantsharma18/enterprise-demo:58e1a8e14e39c6cc67a732f98588928d9beaebd1
         ports:
         - containerPort: 8080
         resources:
