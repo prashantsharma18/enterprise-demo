@@ -34,7 +34,7 @@ spec:
       - name: enterprise-demo
         image: ghcr.io/prashantsharma18/enterprise-demo:latest
         ports:
-        - containerPort: 8080
+        - containerPort: 8000
         resources:
           requests:
             memory: "64Mi"
@@ -42,9 +42,4 @@ spec:
           limits:
             memory: "128Mi"
             cpu: "200m"
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 8080
-          initialDelaySeconds: 5
-          periodSeconds: 10
+        
