@@ -12,9 +12,15 @@ spec:
       prePromotionAnalysis:
         templates:
         - templateName: success-rate
+        args:
+        - name: service-name
+          value: enterprise-demo-preview
       postPromotionAnalysis:
         templates:
         - templateName: success-rate
+        args:
+        - name: service-name
+          value: enterprise-demo-active
   revisionHistoryLimit: 2
   selector:
     matchLabels:
