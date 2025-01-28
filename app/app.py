@@ -47,3 +47,4 @@ async def readiness_check():
 @app.get("/metrics")
 async def metrics():
     return Response(generate_latest(), media_type="text/plain")
+
