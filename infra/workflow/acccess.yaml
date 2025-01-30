@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-admin
+  namespace: argo
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argo-admin-role
+rules:
+  # Workflow access
+  - apiGroups:
+      - argoproj.io
+    resources:
+      - workflows
+      - workflows/finalizers
+      - workflowtemplates
+      - workflowtemplates/finalizers
+      - cronworkflows
+      - cronworkflows/finalizers
+      - workfloweventbindings
+    verbs:
+      - create
+      - delete
+      - deletecollection
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  
+  # Required for UI access
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+      - pods/exec
+      - pods/log
+    verbs:
+      - get
+      - list
+      - watch
+      - delete
+  
+  # Required for submitting workflows
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+      - configmaps
+    verbs:
+      - get
+      - list
+      - watch
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argo-admin-binding
+subjects:
+  - kind: ServiceAccount
+    name: argo-admin
+    namespace: argo
+roleRef:
+  kind: ClusterRole
+  name: argo-admin-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Create service account token
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argo-admin.service-account-token
+  namespace: argo
+  annotations:
+    kubernetes.io/service-account.name: argo-admin
+type: kubernetes.io/service-account-token

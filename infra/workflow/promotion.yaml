@@ -1,0 +1,201 @@
+# First, install Argo Workflows if not already installed
+# workflows/promotion-workflow.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: promotion-workflow
+  namespace: argo
+spec:
+  entrypoint: promote
+  # Define the volumes at workflow level
+  volumes:
+  - name: git-creds
+    secret:
+      secretName: git-creds
+
+  arguments:
+    parameters:
+    - name: image-tag
+      description: "The image tag to promote"
+    - name: git-repo
+      description: "Git repository URL"
+      default: "https://github.com/prashantsharma18/enterprise-demo.git"
+    - name: git-branch
+      description: "Git branch"
+      default: "main"
+  
+  templates:
+  - name: promote
+    dag:
+      tasks:
+      - name: deploy-to-dev
+        template: update-manifest
+        arguments:
+          parameters:
+          - name: env
+            value: dev
+          - name: image-tag
+            value: "{{workflow.parameters.image-tag}}"
+      
+      - name: verify-dev
+        dependencies: [deploy-to-dev]
+        template: verify-deployment
+        arguments:
+          parameters:
+          - name: env
+            value: dev
+      
+      - name: deploy-to-staging
+        dependencies: [verify-dev]
+        template: update-manifest
+        arguments:
+          parameters:
+          - name: env
+            value: staging
+          - name: image-tag
+            value: "{{workflow.parameters.image-tag}}"
+      
+      - name: verify-staging
+        dependencies: [deploy-to-staging]
+        template: verify-deployment
+        arguments:
+          parameters:
+          - name: env
+            value: staging
+      
+      - name: deploy-to-prod
+        dependencies: [verify-staging]
+        template: update-manifest
+        arguments:
+          parameters:
+          - name: env
+            value: production
+          - name: image-tag
+            value: "{{workflow.parameters.image-tag}}"
+      
+      - name: verify-prod
+        dependencies: [deploy-to-prod]
+        template: verify-deployment
+        arguments:
+          parameters:
+          - name: env
+            value: production
+
+  - name: update-manifest
+    inputs:
+      parameters:
+      - name: env
+      - name: image-tag
+    script:
+      image: alpine/git:v2.36.2
+      command: [sh]
+      source: |
+        set -ex
+        
+        # Get token
+        TOKEN=$(cat /git-creds/token)
+        
+        # Configure git
+        git config --global user.email "argo@workflow.local"
+        git config --global user.name "Argo Workflow"
+        
+        # Create URL with token
+        REPO_URL="https://${TOKEN}@github.com/prashantsharma18/enterprise-demo.git"
+        
+        echo "Cloning repository..."
+        git clone --depth 1 -b {{workflow.parameters.git-branch}} "${REPO_URL}" repo
+        
+        echo "Updating manifest..."
+        cd repo/infra/k8s/overlays/{{inputs.parameters.env}}
+        
+        # Update image tag
+        sed -i "s|newTag:.*|newTag: {{inputs.parameters.image-tag}}|g" kustomization.yaml
+        
+        # Commit changes
+        echo "Committing changes..."
+        git add kustomization.yaml
+        git commit -m "Update {{inputs.parameters.env}} to {{inputs.parameters.image-tag}}"
+        
+        # Ensure the remote URL is set with the token
+        git remote set-url origin "${REPO_URL}"
+        
+        echo "Pushing changes..."
+        git push origin {{workflow.parameters.git-branch}}
+      volumeMounts:
+      - name: git-creds
+        mountPath: /git-creds
+        readOnly: true
+
+  - name: verify-deployment
+    inputs:
+      parameters:
+      - name: env
+    script:
+      image: bitnami/kubectl
+      command: [bash]
+      source: |
+        set -e
+        
+        # Wait for ArgoCD sync
+        argocd app wait enterprise-demo-{{inputs.parameters.env}} --health --timeout 300
+        
+        # Wait for rollout
+        kubectl argo rollouts get rollout enterprise-demo -n {{inputs.parameters.env}} --watch
+        
+        # Verify metrics (example)
+        success_rate=$(curl -s http://prometheus:9090/api/v1/query?query=sum(rate(http_requests_total{status="200",env="{{inputs.parameters.env}}"}[5m]))/sum(rate(http_requests_total{env="{{inputs.parameters.env}}"}[5m])))
+        
+        if (( $(echo "$success_rate < 0.95" | bc -l) )); then
+          echo "Success rate below threshold: $success_rate"
+          exit 1
+        fi
+        
+        # Promote the rollout
+        kubectl argo rollouts promote enterprise-demo -n {{inputs.parameters.env}}
+
+# ConfigMap for workflow configuration
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: promotion-config
+  namespace: argo
+data:
+  verify-timeout: "300"
+  success-rate-threshold: "0.95"
+  health-check-endpoint: "/health"
+
+# Create a ServiceAccount and RBAC for the workflow
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: promotion-workflow
+  namespace: argo
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: promotion-workflow-role
+rules:
+- apiGroups: ["argoproj.io"]
+  resources: ["rollouts", "rollouts/status"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+- apiGroups: [""]
+  resources: ["services", "pods"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: promotion-workflow-binding
+subjects:
+- kind: ServiceAccount
+  name: promotion-workflow
+  namespace: argo
+roleRef:
+  kind: ClusterRole
+  name: promotion-workflow-role
+  apiGroup: rbac.authorization.k8s.io
