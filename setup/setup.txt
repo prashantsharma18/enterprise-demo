@@ -9,82 +9,56 @@ brew install helm
 # 3. Install kubectl
 brew install kubectl
 
-# 4. Install Argo CLI
+# 4. Install Argo
 brew install argocd
 brew install argo
 
 # Create Kind Cluster
-kind create cluster --name argo-demo --config kind-config.yaml
+kind create cluster --name argo-demo
 
-# Create Namespaces
-kubectl create namespace argocd
-kubectl create namespace argo
-kubectl create namespace monitoring
-
-helm install prometheus prometheus-community/kube-prometheus-stack -n monitoring
-
-# Install ArgoCD using Helm
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo add argo https://argoproj.github.io/argo-helm
 helm repo update
 
-# Install ArgoCD
-helm install argocd argo/argo-cd \
-  --namespace argocd \
-  --set server.service.type=NodePort \
-  --set server.service.nodePort=30007
+# Install Prometheus
+helm install prometheus prometheus-community/kube-prometheus-stack -n monitoring --create-namespace
+
+# Install ArgoCD using Helm
+helm install argocd argo/argo-cd --namespace argocd --create-namespace
 
 # Install Argo Workflows
-helm install argo-workflows argo/argo-workflows \
-  --namespace argo \
-  --set server.serviceType=NodePort \
-  --set server.serviceNodePort=30009
-
-kubectl patch deployment argo-workflows-server -n argo --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--auth-mode=server"}]'
-kubectl get secret argo-admin.service-account-token -n argo -o jsonpath='{.data.token}' | base64 --decode
+helm install argo-workflows argo/argo-workflows --namespace argo --create-namespace
 
 # Install Argo Rollouts
-helm install argo-rollouts argo/argo-rollouts \
-  --namespace argo-rollouts \
-  --set dashboard.enabled=true \
-  --set dashboard.service.type=ClusterIP
+helm install argo-rollouts argo/argo-rollouts --namespace argo-rollouts --set dashboard.enabled=true --set dashboard.service.type=ClusterIP --create-namespace
+kubectl patch deployment argo-workflows-server -n argo --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--auth-mode=server"}]'
 
-# Get ArgoCD admin password
+# Port forward
+kubectl port-forward service/argocd-server -n argocd 8080:443
+kubectl port-forward svc/argo-workflows-server -n argo 2746:2746
+kubectl port-forward svc/argo-rollouts-dashboard -n argo-rollouts 3100:3100
+
+
+# Login for argocd
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
-kubectl create secret generic git-creds -n argo --from-literal=username=prashantsharma18 --from-literal=password=
-
-# Use port-forwarding instead
-kubectl port-forward svc/argocd-server -n argocd 8080:443
 
 
-
-Authentication Setup:
-bashCopy# The username is your GitHub username
-USERNAME=your-github-username
-For the password/token:
-
-Go to GitHub.com → Your Profile → Settings
-Navigate to "Developer settings" → "Personal access tokens" → "Tokens (classic)"
-Click "Generate new token (classic)"
-Select scopes:
-
-write:packages
-read:packages
-delete:packages
-repo (for private repositories)
-
-# Login to GHCR for testing in local
-docker login ghcr.io -u YOUR_GITHUB_USERNAME -p YOUR_PERSONAL_ACCESS_TOKEN
-
-# Pull your image (after pipeline succeeds)
-docker pull ghcr.io/YOUR_GITHUB_USERNAME/enterprise-demo:latest
-
-
-ssh-keygen -t ed25519 -C "argo@workflow.local" -f deploy_key 
+#Create k8s secret for argo workflow to access the github repo in update manifest
+ssh-keygen -t ed25519 -C "argo@workflow.local" -f deploy_key
+Go to the repo --> settings --> deploy keys. Add the public deploy key that we created
 kubectl create secret generic git-ssh-key --from-file=ssh-privatekey=deploy_key -n argo
 
 
 
+# create a secret for the argo workflow to run a job
+ARGO_PWD=$(kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.password}")
+kubectl create secret generic argocd-auth-creds \
+  --namespace=argo \
+  --from-literal=username=admin \
+  --from-literal=password=$(echo $ARGO_PWD | base64 -d)
 
+
+# Run below command
 kubectl patch configmap argocd-cm -n argocd --type merge -p '
 {
   "data": {
@@ -92,9 +66,14 @@ kubectl patch configmap argocd-cm -n argocd --type merge -p '
   }
 }'
 
-Apply argocd-rbac-cm.yaml
-kubectl apply -f argocd-rbac-cm.yaml
-kubectl rollout restart deployment argocd-server -n argocd
-kubectl rollout status deployment argocd-server -n argocd
-argocd account generate-token --account workflow-automation
-kubectl create secret generic argocd-token --from-literal=token=<paste-your-generated-token-here> -n argo
+
+# Apply ApplicationSet
+kubectl apply -f infra/applications/applicationset.yaml
+Go to Argo cd and "Sync" the application manually. This deploys the application
+This also creates an argo rollout event in argo rollout.
+
+
+#Apply argo workflow
+kubectl apply -f infra/workflow/promotion.yaml
+Open argo workflow http://localhost:2746/ and submit a new workflow. 
+New workflow --> select "promotion workflow" --> insert a image tag https://github.com/*****/enterprise-demo/pkgs/container/enterprise-demo

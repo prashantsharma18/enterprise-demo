@@ -112,11 +112,16 @@ spec:
       env:
         - name: ARGOCD_SERVER
           value: "argocd-server.argocd.svc.cluster.local"
-        - name: ARGOCD_AUTH_TOKEN
+        - name: ARGOCD_USERNAME
           valueFrom:
             secretKeyRef:
-              name: argocd-token
-              key: token
+              name: argocd-auth-creds
+              key: username
+        - name: ARGOCD_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: argocd-auth-creds
+              key: password
       source: |
         set -e
         
@@ -128,84 +133,13 @@ spec:
         chmod +x /usr/local/bin/argocd
         
         echo "Logging into ArgoCD..."
-        argocd login $ARGOCD_SERVER --username admin --password BRzhTgEzaYbp3Lvj --insecure
+        argocd login $ARGOCD_SERVER --username $ARGOCD_USERNAME --password $ARGOCD_PASSWORD --insecure
         
         argocd app sync enterprise-demo-{{inputs.parameters.env}}
         
         echo "Waiting for ArgoCD sync..."
         argocd app wait enterprise-demo-{{inputs.parameters.env}} --health --timeout 300
 
-  - name: verify-preview
-    inputs:
-      parameters:
-      - name: env
-    script:
-      image: alpine:3.18
-      command: [sh]
-      source: |
-        set -e
-        
-        # Install required tools
-        apk add --no-cache curl bash git
-
-        # Install kubectl
-        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-        chmod +x kubectl
-        mv kubectl /usr/local/bin/
-
-        # Install argo rollouts plugin
-        curl -sL https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64 -o /usr/local/bin/kubectl-argo-rollouts
-        chmod +x /usr/local/bin/kubectl-argo-rollouts
-        
-        echo "Waiting for preview service to be ready..."
-        kubectl argo rollouts get rollout enterprise-demo -n {{inputs.parameters.env}} --watch=false
-        
-        # Verify the preview service is available
-        if ! kubectl get svc enterprise-demo-preview -n {{inputs.parameters.env}}; then
-          echo "Preview service not found"
-          exit 1
-        fi
-
-  - name: approve
-    suspend: {}
-
-  - name: promote-rollout
-    inputs:
-      parameters:
-      - name: env
-    script:
-      image: alpine:3.18
-      command: [sh]
-      source: |
-        set -e
-        
-        # Install required tools
-        apk add --no-cache curl bash git
-
-        # Install kubectl
-        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-        chmod +x kubectl
-        mv kubectl /usr/local/bin/
-
-        # Install argo rollouts plugin
-        curl -sL https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64 -o /usr/local/bin/kubectl-argo-rollouts
-        chmod +x /usr/local/bin/kubectl-argo-rollouts
-        
-        echo "Promoting rollout..."
-        kubectl argo rollouts promote enterprise-demo -n {{inputs.parameters.env}}
-
-        echo "Waiting for promotion to complete..."
-        for i in {1..30}; do
-          STATUS=$(kubectl argo rollouts get rollout enterprise-demo -n {{inputs.parameters.env}} --output json | jq -r '.status.phase')
-          if [[ "$STATUS" == "Healthy" ]]; then
-            echo "Promotion successful!"
-            exit 0
-          fi
-          sleep 10
-        done
-        
-        echo "Promotion failed!"
-        exit 1
 
   - name: rollback-rollout
     inputs:
