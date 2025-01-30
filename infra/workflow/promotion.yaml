@@ -133,26 +133,51 @@ spec:
       parameters:
       - name: env
     script:
-      image: bitnami/kubectl
+      image: argoproj/argocd-cli:latest  # Image with argocd CLI
       command: [bash]
+      env:
+        - name: ARGOCD_SERVER
+          value: "argocd-server.argocd.svc.cluster.local"  # Update this to match your ArgoCD server address
+        - name: ARGOCD_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: argocd-token
+              key: token
       source: |
         set -e
         
-        # Wait for ArgoCD sync
+        echo "Logging into ArgoCD..."
+        argocd login $ARGOCD_SERVER --auth-token $ARGOCD_AUTH_TOKEN --insecure
+        
+        echo "Waiting for ArgoCD sync..."
         argocd app wait enterprise-demo-{{inputs.parameters.env}} --health --timeout 300
         
-        # Wait for rollout
+        echo "Waiting for rollout..."
+        # Install kubectl
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        chmod +x kubectl
+        mv kubectl /usr/local/bin/
+        
+        # Install argo rollouts kubectl plugin
+        curl -LO https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
+        chmod +x kubectl-argo-rollouts-linux-amd64
+        mv kubectl-argo-rollouts-linux-amd64 /usr/local/bin/kubectl-argo-rollouts
+        
         kubectl argo rollouts get rollout enterprise-demo -n {{inputs.parameters.env}} --watch
         
-        # Verify metrics (example)
-        success_rate=$(curl -s http://prometheus:9090/api/v1/query?query=sum(rate(http_requests_total{status="200",env="{{inputs.parameters.env}}"}[5m]))/sum(rate(http_requests_total{env="{{inputs.parameters.env}}"}[5m])))
-        
-        if (( $(echo "$success_rate < 0.95" | bc -l) )); then
-          echo "Success rate below threshold: $success_rate"
-          exit 1
+        echo "Checking metrics..."
+        # Note: Adjust the metrics check based on your Prometheus setup
+        # This is a placeholder - you'll need to modify based on your actual metrics setup
+        if [ -n "$PROMETHEUS_URL" ]; then
+          success_rate=$(curl -s "$PROMETHEUS_URL/api/v1/query?query=sum(rate(http_requests_total{status='200',env='{{inputs.parameters.env}}'}[5m]))/sum(rate(http_requests_total{env='{{inputs.parameters.env}}'}[5m]))")
+          
+          if (( $(echo "$success_rate < 0.95" | bc -l) )); then
+            echo "Success rate below threshold: $success_rate"
+            exit 1
+          fi
         fi
         
-        # Promote the rollout
+        echo "Promoting rollout..."
         kubectl argo rollouts promote enterprise-demo -n {{inputs.parameters.env}}
 
 # ConfigMap for workflow configuration

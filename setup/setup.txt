@@ -78,3 +78,15 @@ docker pull ghcr.io/YOUR_GITHUB_USERNAME/enterprise-demo:latest
 
 ssh-keygen -t ed25519 -C "argo@workflow.local" -f deploy_key 
 kubectl create secret generic git-ssh-key --from-file=ssh-privatekey=deploy_key -n argo
+
+
+
+
+kubectl patch configmap argocd-cm -n argocd --type merge -p '
+{
+  "data": {
+    "accounts.workflow-automation": "apiKey"
+  }
+}'
+
+---
