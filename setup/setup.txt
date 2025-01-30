@@ -19,6 +19,9 @@ kind create cluster --name argo-demo --config kind-config.yaml
 # Create Namespaces
 kubectl create namespace argocd
 kubectl create namespace argo
+kubectl create namespace monitoring
+
+helm install prometheus prometheus-community/kube-prometheus-stack -n monitoring
 
 # Install ArgoCD using Helm
 helm repo add argo https://argoproj.github.io/argo-helm
@@ -89,4 +92,11 @@ kubectl patch configmap argocd-cm -n argocd --type merge -p '
   }
 }'
 
----
+Apply argocd-rbac-cm.yaml
+kubectl apply -f argocd-rbac-cm.yaml
+kubectl rollout restart deployment argocd-server -n argocd
+kubectl rollout status deployment argocd-server -n argocd
+argocd account generate-token --account workflow-automation
+kubectl create secret generic argocd-token \
+  --from-literal=token=<paste-your-generated-token-here> \
+  -n argo

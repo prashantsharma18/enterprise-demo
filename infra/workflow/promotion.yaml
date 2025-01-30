@@ -133,11 +133,11 @@ spec:
       parameters:
       - name: env
     script:
-      image: argoproj/argocd-cli:latest  # Image with argocd CLI
+      image: argoproj/argocd-cli:latest
       command: [bash]
       env:
         - name: ARGOCD_SERVER
-          value: "argocd-server.argocd.svc.cluster.local"  # Update this to match your ArgoCD server address
+          value: "argocd-server.argocd.svc.cluster.local"
         - name: ARGOCD_AUTH_TOKEN
           valueFrom:
             secretKeyRef:
@@ -163,19 +163,8 @@ spec:
         chmod +x kubectl-argo-rollouts-linux-amd64
         mv kubectl-argo-rollouts-linux-amd64 /usr/local/bin/kubectl-argo-rollouts
         
+        # Wait for rollout to complete (this includes the analysis step)
         kubectl argo rollouts get rollout enterprise-demo -n {{inputs.parameters.env}} --watch
-        
-        echo "Checking metrics..."
-        # Note: Adjust the metrics check based on your Prometheus setup
-        # This is a placeholder - you'll need to modify based on your actual metrics setup
-        if [ -n "$PROMETHEUS_URL" ]; then
-          success_rate=$(curl -s "$PROMETHEUS_URL/api/v1/query?query=sum(rate(http_requests_total{status='200',env='{{inputs.parameters.env}}'}[5m]))/sum(rate(http_requests_total{env='{{inputs.parameters.env}}'}[5m]))")
-          
-          if (( $(echo "$success_rate < 0.95" | bc -l) )); then
-            echo "Success rate below threshold: $success_rate"
-            exit 1
-          fi
-        fi
         
         echo "Promoting rollout..."
         kubectl argo rollouts promote enterprise-demo -n {{inputs.parameters.env}}
