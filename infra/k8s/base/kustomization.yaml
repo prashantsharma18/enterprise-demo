@@ -5,7 +5,6 @@ resources:
 - service.yaml
 - configmap.yaml
 - rollout.yaml
-- analysis.yaml
 - monitor.yaml
 # - notification.yaml
 # - notification-triggers.yaml

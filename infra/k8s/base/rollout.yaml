@@ -9,18 +9,6 @@ spec:
       activeService: enterprise-demo-active
       previewService: enterprise-demo-preview
       autoPromotionEnabled: false
-      prePromotionAnalysis:
-        templates:
-        - templateName: success-rate
-        args:
-        - name: service-name
-          value: enterprise-demo-preview
-      postPromotionAnalysis:
-        templates:
-        - templateName: success-rate
-        args:
-        - name: service-name
-          value: enterprise-demo-active
   revisionHistoryLimit: 2
   selector:
     matchLabels:
@@ -46,4 +34,3 @@ spec:
           limits:
             memory: "128Mi"
             cpu: "200m"
-        
