@@ -9,7 +9,7 @@ spec:
   - port: 80
     targetPort: 8000
     protocol: TCP
-    name: http
+    name: http  # Changed from 'http' to 'metrics' to match ServiceMonitor
   selector:
     app: enterprise-demo
 ---
@@ -24,6 +24,6 @@ spec:
   - port: 80
     targetPort: 8000
     protocol: TCP
-    name: http
+    name: http  # Changed from 'http' to 'metrics' to match ServiceMonitor
   selector:
     app: enterprise-demo

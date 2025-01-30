@@ -2,14 +2,17 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: enterprise-demo-monitor
-  namespace: monitoring  # Prometheus Operator's namespace
+  namespace: monitoring
+  labels:
+    release: prometheus  # Add this to match your Prometheus instance
 spec:
   selector:
     matchLabels:
       app: enterprise-demo
   namespaceSelector:
     matchNames:
-    - dev  # Ensure it targets the dev namespace
+      - dev
   endpoints:
-  - port: metrics
-    interval: 15s
+    - port: metrics
+      interval: 15s
+      path: /metrics  # Explicitly specify the path
