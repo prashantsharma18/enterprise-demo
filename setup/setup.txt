@@ -97,6 +97,4 @@ kubectl apply -f argocd-rbac-cm.yaml
 kubectl rollout restart deployment argocd-server -n argocd
 kubectl rollout status deployment argocd-server -n argocd
 argocd account generate-token --account workflow-automation
-kubectl create secret generic argocd-token \
-  --from-literal=token=<paste-your-generated-token-here> \
-  -n argo
+kubectl create secret generic argocd-token --from-literal=token=<paste-your-generated-token-here> -n argo

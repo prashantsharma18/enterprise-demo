@@ -154,7 +154,7 @@ spec:
         chmod +x /usr/local/bin/argocd
         
         echo "Logging into ArgoCD..."
-        argocd login $ARGOCD_SERVER --auth-token $ARGOCD_AUTH_TOKEN --insecure
+        argocd login $ARGOCD_SERVER --auth-token BRzhTgEzaYbp3Lvj --insecure
         
         argocd app sync enterprise-demo-{{inputs.parameters.env}}
         
