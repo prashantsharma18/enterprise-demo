@@ -8,7 +8,8 @@ spec:
       app: enterprise-demo
   endpoints:
   - port: http
-    path: /metrics
+    path: /ready
+    interval: 30s  # Adjust as needed
   namespaceSelector:
     matchNames:
     - dev

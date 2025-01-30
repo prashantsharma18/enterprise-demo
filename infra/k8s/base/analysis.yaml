@@ -14,9 +14,9 @@ spec:
         address: http://prometheus-operated.monitoring:9090
         query: |
           avg(
-            sum(rate(http_success_total{endpoint!~"metrics|health|ready"}[5m]))
+            sum(rate(http_success_total{endpoint="/ready"}[5m]))
           )
           /
           avg(
-            sum(rate(http_requests_total{endpoint!~"metrics|health|ready"}[5m]))
+            sum(rate(http_requests_total{endpoint="/ready"}[5m]))
           )
