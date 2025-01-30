@@ -6,13 +6,8 @@ metadata:
   name: promotion-workflow
   namespace: argo
 spec:
+  serviceAccountName: workflow-runner
   entrypoint: promote
-  # Define the volumes at workflow level
-  volumes:
-  - name: git-creds
-    secret:
-      secretName: git-creds
-
   arguments:
     parameters:
     - name: image-tag
@@ -87,44 +82,51 @@ spec:
       - name: env
       - name: image-tag
     script:
-      image: alpine/git:v2.36.2
-      command: [sh]
+      image: bitnami/git:latest
+      command: [bash]
+      env:
+        - name: GIT_SSH_COMMAND
+          value: "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+      volumeMounts:
+        - name: ssh-key
+          mountPath: /ssh-secrets
+          readOnly: true
+        - name: workspace
+          mountPath: /root/.ssh
       source: |
+        #!/bin/bash
         set -ex
         
-        # Get token
-        TOKEN=$(cat /git-creds/token)
+        # Create SSH directory with correct permissions
+        mkdir -p /root/.ssh
+        cp /ssh-secrets/ssh-privatekey /root/.ssh/id_rsa
+        chmod 700 /root/.ssh
+        chmod 400 /root/.ssh/id_rsa
         
-        # Configure git
+        # Configure Git
         git config --global user.email "argo@workflow.local"
         git config --global user.name "Argo Workflow"
-        
-        # Create URL with token
-        REPO_URL="https://${TOKEN}@github.com/prashantsharma18/enterprise-demo.git"
-        
-        echo "Cloning repository..."
+
+        # Clone repository
+        REPO_URL="git@github.com:prashantsharma18/enterprise-demo.git"
         git clone --depth 1 -b {{workflow.parameters.git-branch}} "${REPO_URL}" repo
         
-        echo "Updating manifest..."
         cd repo/infra/k8s/overlays/{{inputs.parameters.env}}
         
-        # Update image tag
+        # Update manifest
         sed -i "s|newTag:.*|newTag: {{inputs.parameters.image-tag}}|g" kustomization.yaml
         
-        # Commit changes
-        echo "Committing changes..."
+        # Commit and push changes
         git add kustomization.yaml
         git commit -m "Update {{inputs.parameters.env}} to {{inputs.parameters.image-tag}}"
-        
-        # Ensure the remote URL is set with the token
-        git remote set-url origin "${REPO_URL}"
-        
-        echo "Pushing changes..."
         git push origin {{workflow.parameters.git-branch}}
-      volumeMounts:
-      - name: git-creds
-        mountPath: /git-creds
-        readOnly: true
+    volumes:
+    - name: ssh-key
+      secret:
+        secretName: git-ssh-key
+        defaultMode: 0400
+    - name: workspace
+      emptyDir: {}
 
   - name: verify-deployment
     inputs:
@@ -198,4 +200,45 @@ subjects:
 roleRef:
   kind: ClusterRole
   name: promotion-workflow-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: workflow-runner
+  namespace: argo
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: workflow-role
+  namespace: argo
+rules:
+- apiGroups: ["argoproj.io"]
+  resources:
+  - workflows
+  - workflowtasksets
+  - workflowtaskresults
+  - workflowtemplates
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["pods", "pods/log"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: workflow-rolebinding
+  namespace: argo
+subjects:
+- kind: ServiceAccount
+  name: workflow-runner
+  namespace: argo
+roleRef:
+  kind: Role
+  name: workflow-role
   apiGroup: rbac.authorization.k8s.io
