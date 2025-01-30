@@ -6,6 +6,6 @@ resources:
 - configmap.yaml
 - rollout.yaml
 - analysis.yaml
-- monitoring.yaml
+- monitor.yaml
 # - notification.yaml
 # - notification-triggers.yaml
