@@ -133,8 +133,8 @@ spec:
       parameters:
       - name: env
     script:
-      image: argoproj/argocd-cli:latest
-      command: [bash]
+      image: alpine:3.18
+      command: [sh]  # Changed from bash to sh
       env:
         - name: ARGOCD_SERVER
           value: "argocd-server.argocd.svc.cluster.local"
@@ -146,28 +146,33 @@ spec:
       source: |
         set -e
         
+        # Install required tools
+        apk add --no-cache curl bash git
+
+        # Install ArgoCD CLI
+        curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+        chmod +x /usr/local/bin/argocd
+        
         echo "Logging into ArgoCD..."
         argocd login $ARGOCD_SERVER --auth-token $ARGOCD_AUTH_TOKEN --insecure
         
+        argocd app sync enterprise-demo-{{inputs.parameters.env}}
+        
         echo "Waiting for ArgoCD sync..."
         argocd app wait enterprise-demo-{{inputs.parameters.env}} --health --timeout 300
-        
-        echo "Waiting for rollout..."
+
         # Install kubectl
         curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
         chmod +x kubectl
         mv kubectl /usr/local/bin/
+
+        echo "Verifying rollout status..."
+        # Install argo rollouts plugin
+        curl -sL https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64 -o /usr/local/bin/kubectl-argo-rollouts
+        chmod +x /usr/local/bin/kubectl-argo-rollouts
         
-        # Install argo rollouts kubectl plugin
-        curl -LO https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
-        chmod +x kubectl-argo-rollouts-linux-amd64
-        mv kubectl-argo-rollouts-linux-amd64 /usr/local/bin/kubectl-argo-rollouts
-        
-        # Wait for rollout to complete (this includes the analysis step)
+        # Wait for rollout completion
         kubectl argo rollouts get rollout enterprise-demo -n {{inputs.parameters.env}} --watch
-        
-        echo "Promoting rollout..."
-        kubectl argo rollouts promote enterprise-demo -n {{inputs.parameters.env}}
 
 # ConfigMap for workflow configuration
 ---
