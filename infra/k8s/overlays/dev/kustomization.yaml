@@ -9,4 +9,4 @@ patchesStrategicMerge:
 - rollout-patch.yaml
 images:
 - name: ghcr.io/prashantsharma18/enterprise-demo
-  newTag: 9848cabe3d29b325f9ca39f97523072e850463c4
+  newTag: 03da985be00e758741e86be27744ab2829c13a5d
